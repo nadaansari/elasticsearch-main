@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/keycloak" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/pcainsigh-front" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/pcainsight-backend" vcs="Git" />
+  </component>
+</project>

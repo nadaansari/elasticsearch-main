@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: none;
+        stroke: #f0f1f3;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 2px;
+      }
+    </style>
+  </defs>
+  <path id="Path_3810" data-name="Path 3810" class="cls-1" d="M13,8.556V13m0,4.444h.011M23,13A10,10,0,1,1,13,3,10,10,0,0,1,23,13Z" transform="translate(-2 -2)"/>
+</svg>

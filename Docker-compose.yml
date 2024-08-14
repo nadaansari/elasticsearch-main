@@ -1,0 +1,183 @@
+version: '3.7'
+
+services:
+  setup:
+    profiles:
+      - setup
+    build:
+      context: setup/
+      args:
+        ELASTIC_VERSION: ${ELASTIC_VERSION}
+    init: true
+    volumes:
+      - ./setup/entrypoint.sh:/entrypoint.sh:ro,Z
+      - ./setup/lib.sh:/lib.sh:ro,Z
+      - ./setup/roles:/roles:ro,Z
+    environment:
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:-}
+      LOGSTASH_INTERNAL_PASSWORD: ${LOGSTASH_INTERNAL_PASSWORD:-}
+      KIBANA_SYSTEM_PASSWORD: ${KIBANA_SYSTEM_PASSWORD:-}
+      METRICBEAT_INTERNAL_PASSWORD: ${METRICBEAT_INTERNAL_PASSWORD:-}
+      FILEBEAT_INTERNAL_PASSWORD: ${FILEBEAT_INTERNAL_PASSWORD:-}
+      HEARTBEAT_INTERNAL_PASSWORD: ${HEARTBEAT_INTERNAL_PASSWORD:-}
+      MONITORING_INTERNAL_PASSWORD: ${MONITORING_INTERNAL_PASSWORD:-}
+      BEATS_SYSTEM_PASSWORD: ${BEATS_SYSTEM_PASSWORD:-}
+
+    depends_on:
+      - elasticsearch
+
+  elasticsearch:
+    build:
+      context: elasticsearch/
+      args:
+        ELASTIC_VERSION: ${ELASTIC_VERSION}
+    volumes:
+      - elasticsearch:/usr/share/elasticsearch/data:Z
+    ports:
+      - 9200:9200
+    environment:
+      node.name: elasticsearch
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+      ELASTIC_PASSWORD: 4PpVyD_AyaptIRN_5zyV
+      discovery.type: single-node
+
+    depends_on:
+      - "zookeeper"
+      - "kafka"
+    restart: unless-stopped
+
+  logstash:
+    build:
+      context: logstash/
+      args:
+        ELASTIC_VERSION: ${ELASTIC_VERSION}
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:rw,Z
+      -  C:/Users/nadaa/Downloads/postgresql-42.7.2.jar:/usr/share/logstash/postgresql-42.7.2.jar:ro,Z  # Mount the JDBC driver
+    ports:
+      - 5044:5044
+      - 50000:50000/tcp
+      - 50000:50000/udp
+      - 9600:9600
+    environment:
+      LS_JAVA_OPTS: -Xms256m -Xmx256m
+      LOGSTASH_INTERNAL_PASSWORD: ${LOGSTASH_INTERNAL_PASSWORD:-}
+
+    depends_on:
+      - elasticsearch
+
+
+  kibana:
+    build:
+      context: kibana/
+      args:
+        ELASTIC_VERSION: ${ELASTIC_VERSION}
+    ports:
+      - 5601:5601
+    environment:
+      KIBANA_SYSTEM_PASSWORD: ${KIBANA_SYSTEM_PASSWORD:-}
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: kibana_system
+      ELASTICSEARCH_PASSWORD: kibana_system
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  pgadmin:
+    image: 'dpage/pgadmin4:latest'
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@localhost.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_LISTEN_PORT: 5050
+    ports:
+      - "5050:5050"
+    networks:
+      - bike-store
+
+  zookeeper:
+    restart: always
+    image: docker.io/bitnami/zookeeper:3.8
+    ports:
+      - "2181:2181"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - kafka-net
+
+  kafka:
+    container_name: bike-store-kafka
+    image: landoop/fast-data-dev:2.5
+    environment:
+      ADV_HOST: kafka
+      RUNTESTS: 0
+      CONNECTORS: debezium-postgres
+      SAMPLEDATA: 0
+      RUNNING_SAMPLEDATA: 0
+    ports:
+      - 3030:3030
+      - 8081-8083:8081-8083
+      - 9581-9585:9581-9585
+      - 9092:9092
+    networks:
+      - kafka-net
+
+
+
+  connect:
+    image: debezium/connect
+    ports:
+      - "8085:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: my_connect_configs
+      OFFSET_STORAGE_TOPIC: my_connect_offsets
+      STATUS_STORAGE_TOPIC: my_connect_statuses
+      CONNECT_REST_ADVERTISED_HOST_NAME: connect
+      CONNECT_REST_PORT: 8083
+    depends_on:
+      - zookeeper
+      - kafka
+    networks:
+      - kafka-net
+      - bike-store
+    volumes:
+      - ./debezium.json:/debezium.json
+
+  postgres:
+    image: postgres:16.3
+    environment:
+      POSTGRES_DB: NewDB
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./path_to_temp_db_data_new:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./NewDB.sql:/docker-entrypoint-initdb.d/NewDB.sql
+    networks:
+      - bike-store
+      - kafka-net
+  elasticsearch_connector:
+    image: docker.elastic.co/enterprise-search/elastic-connectors:8.13.4.0
+    volumes:
+      - ./connectors-config/config.yml:/usr/share/enterprise-search/config/config.yml
+    environment:
+      - CONFIG_PATH=/usr/share/enterprise-search/config/config.yml
+    depends_on:
+      - elasticsearch
+    networks:
+      - bike-store
+
+
+networks:
+  elk:
+    driver: bridge
+  bike-store:
+    driver: bridge
+  kafka-net:
+    driver: bridge
+
+volumes:
+  elasticsearch:
